@@ -225,3 +225,8 @@ make px4_sitl_default sitl_gazebo
 or refer to [this issue](https://github.com/PX4/Firmware/issues?utf8=%E2%9C%93&q=%2Firis%2Firis.sdf+) the [ROS with Gazebo Simulation PX4 Documentation](https://dev.px4.io/master/en/simulation/ros_interface.html). 
 
 ## Some notes based what I understood:
+1. The implementation uses a cascaded structure, where it uses a high level position controllber based on the second reference attahced in the README.
+2. Further, the lower level controller can be any of the two based on the error computation of orientation(quaternion/ Geomteric based). Based on this, the body rates are computed according to the respective papers.
+3. For the geometric attitude controller, refer to first reference attached in the README. For the quaternion based attitude control refer to [this](https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/154099/eth-7387-01.pdf) link.
+4. To get the flow of the mavros controller refer to the following picture:
+
