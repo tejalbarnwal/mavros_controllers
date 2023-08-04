@@ -79,6 +79,8 @@
 using namespace std;
 using namespace Eigen;
 
+
+// states of the MAV
 enum class MAV_STATE {
   MAV_STATE_UNINIT,
   MAV_STATE_BOOT,
@@ -91,40 +93,42 @@ enum class MAV_STATE {
   MAV_STATE_FLIGHT_TERMINATION,
 };
 
+
+
 class geometricCtrl {
  private:
   ros::NodeHandle nh_;
   ros::NodeHandle nh_private_;
-  ros::Subscriber referenceSub_;
-  ros::Subscriber flatreferenceSub_;
-  ros::Subscriber multiDOFJointSub_;
-  ros::Subscriber mavstateSub_;
-  ros::Subscriber mavposeSub_, gzmavposeSub_;
-  ros::Subscriber mavtwistSub_;
-  ros::Subscriber yawreferenceSub_;
-  ros::Publisher rotorVelPub_, angularVelPub_, target_pose_pub_;
-  ros::Publisher referencePosePub_;
-  ros::Publisher posehistoryPub_;
-  ros::Publisher systemstatusPub_;
-  ros::ServiceClient arming_client_;
-  ros::ServiceClient set_mode_client_;
-  ros::ServiceServer ctrltriggerServ_;
-  ros::ServiceServer land_service_;
-  ros::Timer cmdloop_timer_, statusloop_timer_;
-  ros::Time last_request_, reference_request_now_, reference_request_last_;
+  ros::Subscriber referenceSub_; // 
+  ros::Subscriber flatreferenceSub_; //
+  ros::Subscriber multiDOFJointSub_; // 
+  ros::Subscriber mavstateSub_; // 
+  ros::Subscriber mavposeSub_, gzmavposeSub_; //
+  ros::Subscriber mavtwistSub_; //
+  ros::Subscriber yawreferenceSub_; //
+  ros::Publisher rotorVelPub_, angularVelPub_, target_pose_pub_; //
+  ros::Publisher referencePosePub_; //
+  ros::Publisher posehistoryPub_; //
+  ros::Publisher systemstatusPub_; //
+  ros::ServiceClient arming_client_; //
+  ros::ServiceClient set_mode_client_; //
+  ros::ServiceServer ctrltriggerServ_; //
+  ros::ServiceServer land_service_; //
+  ros::Timer cmdloop_timer_, statusloop_timer_; // 
+  ros::Time last_request_, reference_request_now_, reference_request_last_; //
 
-  string mav_name_;
-  bool fail_detec_{false};
-  bool feedthrough_enable_{false};
-  bool ctrl_enable_{true};
-  int ctrl_mode_;
-  bool landing_commanded_{false};
-  bool sim_enable_;
-  bool velocity_yaw_;
-  double kp_rot_, kd_rot_;
-  double reference_request_dt_;
-  double norm_thrust_const_, norm_thrust_offset_;
-  double max_fb_acc_;
+  string mav_name_; // any name
+  bool fail_detec_{false}; //
+  bool feedthrough_enable_{false}; // not sure
+  bool ctrl_enable_{true}; //
+  int ctrl_mode_; // error to be measured in quaternion or geomteric
+  bool landing_commanded_{false}; //
+  bool sim_enable_; //
+  bool velocity_yaw_; // why bool?
+  double kp_rot_, kd_rot_; //
+  double reference_request_dt_; //
+  double norm_thrust_const_, norm_thrust_offset_; //
+  double max_fb_acc_; // fb? body frame acc? in what direction?
 
   mavros_msgs::State current_state_;
   mavros_msgs::CommandBool arm_cmd_;
@@ -136,11 +140,11 @@ class geometricCtrl {
   Eigen::Vector3d mavPos_, mavVel_, mavRate_;
   double mavYaw_;
   Eigen::Vector3d gravity_{Eigen::Vector3d(0.0, 0.0, -9.8)};
-  Eigen::Vector4d mavAtt_, q_des;
+  Eigen::Vector4d mavAtt_, q_des; // mavAtt: is the current qiuaternion attidutde obstained form mavros msgd
   Eigen::Vector4d cmdBodyRate_;  //{wx, wy, wz, Thrust}
-  Eigen::Vector3d Kpos_, Kvel_, D_;
-  double Kpos_x_, Kpos_y_, Kpos_z_, Kvel_x_, Kvel_y_, Kvel_z_;
-  int posehistory_window_;
+  Eigen::Vector3d Kpos_, Kvel_, D_; // ?
+  double Kpos_x_, Kpos_y_, Kpos_z_, Kvel_x_, Kvel_y_, Kvel_z_; //?
+  int posehistory_window_; //?
 
   void pubMotorCommands();
   void pubRateCommands(const Eigen::Vector4d &cmd, const Eigen::Vector4d &target_attitude);

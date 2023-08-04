@@ -223,3 +223,5 @@ make px4_sitl_default sitl_gazebo
 ```
 
 or refer to [this issue](https://github.com/PX4/Firmware/issues?utf8=%E2%9C%93&q=%2Firis%2Firis.sdf+) the [ROS with Gazebo Simulation PX4 Documentation](https://dev.px4.io/master/en/simulation/ros_interface.html). 
+
+## Some notes based what I understood:

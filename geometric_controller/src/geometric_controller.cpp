@@ -48,6 +48,8 @@ using namespace std;
 // Constructor
 geometricCtrl::geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &nh_private)
     : nh_(nh), nh_private_(nh_private), node_state(WAITING_FOR_HOME_POSE) {
+
+      // desired setpoint/ trajectory input
   referenceSub_ =
       nh_.subscribe("reference/setpoint", 1, &geometricCtrl::targetCallback, this, ros::TransportHints().tcpNoDelay());
   flatreferenceSub_ = nh_.subscribe("reference/flatsetpoint", 1, &geometricCtrl::flattargetCallback, this,
@@ -56,13 +58,19 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &n
       nh_.subscribe("reference/yaw", 1, &geometricCtrl::yawtargetCallback, this, ros::TransportHints().tcpNoDelay());
   multiDOFJointSub_ = nh_.subscribe("command/trajectory", 1, &geometricCtrl::multiDOFJointCallback, this,
                                     ros::TransportHints().tcpNoDelay());
+
+      // sub to feedpack about the pose, state
   mavstateSub_ =
       nh_.subscribe("mavros/state", 1, &geometricCtrl::mavstateCallback, this, ros::TransportHints().tcpNoDelay());
   mavposeSub_ = nh_.subscribe("mavros/local_position/pose", 1, &geometricCtrl::mavposeCallback, this,
                               ros::TransportHints().tcpNoDelay());
   mavtwistSub_ = nh_.subscribe("mavros/local_position/velocity_local", 1, &geometricCtrl::mavtwistCallback, this,
                                ros::TransportHints().tcpNoDelay());
+
+      // nout sure about this
   ctrltriggerServ_ = nh_.advertiseService("trigger_rlcontroller", &geometricCtrl::ctrltriggerCallback, this);
+      
+      // why we need two timers
   cmdloop_timer_ = nh_.createTimer(ros::Duration(0.01), &geometricCtrl::cmdloopCallback,
                                    this);  // Define timer for constant loop rate
   statusloop_timer_ = nh_.createTimer(ros::Duration(1), &geometricCtrl::statusloopCallback,
@@ -75,6 +83,8 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &n
   systemstatusPub_ = nh_.advertise<mavros_msgs::CompanionProcessStatus>("mavros/companion_process/status", 1);
   arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
   set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
+
+  // land service
   land_service_ = nh_.advertiseService("land", &geometricCtrl::landCallback, this);
 
   nh_private_.param<string>("mavname", mav_name_, "iris");
@@ -91,7 +101,7 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &n
   D_ << dx, dy, dz;
 
   double attctrl_tau;
-  nh_private_.param<double>("attctrl_constant", attctrl_tau, 0.1);
+  nh_private_.param<double>("attctrl_constant", attctrl_tau, 0.1); // what is this?
   nh_private_.param<double>("normalizedthrust_constant", norm_thrust_const_, 0.05);  // 1 / max acceleration
   nh_private_.param<double>("normalizedthrust_offset", norm_thrust_offset_, 0.1);    // 1 / max acceleration
   nh_private_.param<double>("Kp_x", Kpos_x_, 8.0);
@@ -115,18 +125,20 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &n
   bool jerk_enabled = false;
   if (!jerk_enabled) {
     if (ctrl_mode_ == ERROR_GEOMETRIC) {
-      controller_ = std::make_shared<NonlinearGeometricControl>(attctrl_tau);
+      controller_ = std::make_shared<NonlinearGeometricControl>(attctrl_tau); // geomtric
     } else {
-      controller_ = std::make_shared<NonlinearAttitudeControl>(attctrl_tau);
+      controller_ = std::make_shared<NonlinearAttitudeControl>(attctrl_tau); // quaternion based
     }
   } else {
-    controller_ = std::make_shared<JerkTrackingControl>();
+    controller_ = std::make_shared<JerkTrackingControl>(); //
   }
 }
 geometricCtrl::~geometricCtrl() {
   // Destructor
 }
 
+
+// clllbacks for different input setpoints, trajectories
 void geometricCtrl::targetCallback(const geometry_msgs::TwistStamped &msg) {
   reference_request_last_ = reference_request_now_;
   targetPos_prev_ = targetPos_;
@@ -135,7 +147,7 @@ void geometricCtrl::targetCallback(const geometry_msgs::TwistStamped &msg) {
   reference_request_now_ = ros::Time::now();
   reference_request_dt_ = (reference_request_now_ - reference_request_last_).toSec();
 
-  targetPos_ = toEigen(msg.twist.angular);
+  targetPos_ = toEigen(msg.twist.angular); // why is it taing angular velocities
   targetVel_ = toEigen(msg.twist.linear);
 
   if (reference_request_dt_ > 0)
@@ -207,6 +219,7 @@ void geometricCtrl::multiDOFJointCallback(const trajectory_msgs::MultiDOFJointTr
   }
 }
 
+// callbacks for feedback from px4
 void geometricCtrl::mavposeCallback(const geometry_msgs::PoseStamped &msg) {
   if (!received_home_pose) {
     received_home_pose = true;
@@ -225,11 +238,15 @@ void geometricCtrl::mavtwistCallback(const geometry_msgs::TwistStamped &msg) {
   mavRate_ = toEigen(msg.twist.angular);
 }
 
+
+// callback fro landign servcie
 bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request, std_srvs::SetBool::Response &response) {
   node_state = LANDING;
   return true;
 }
 
+// I think the state handler/ FSM like thing!
+// would nneed to confirm
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
   switch (node_state) {
     case WAITING_FOR_HOME_POSE:
@@ -240,7 +257,7 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
 
     case MISSION_EXECUTION: {
       Eigen::Vector3d desired_acc;
-      if (feedthrough_enable_) {
+      if (feedthrough_enable_) { // what is the use of enable feedthrough
         desired_acc = targetAcc_;
       } else {
         desired_acc = controlPosition(targetPos_, targetVel_, targetAcc_);
@@ -272,6 +289,7 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
 
 void geometricCtrl::mavstateCallback(const mavros_msgs::State::ConstPtr &msg) { current_state_ = *msg; }
 
+// ARM and OFFBOARD responsibility 
 void geometricCtrl::statusloopCallback(const ros::TimerEvent &event) {
   if (sim_enable_) {
     // Enable OFFBoard mode and arm automatically
@@ -296,6 +314,8 @@ void geometricCtrl::statusloopCallback(const ros::TimerEvent &event) {
   pubSystemStatus();
 }
 
+
+// some helper functions used in the callbacks are defined
 void geometricCtrl::pubReferencePose(const Eigen::Vector3d &target_position, const Eigen::Vector4d &target_attitude) {
   geometry_msgs::PoseStamped msg;
 
